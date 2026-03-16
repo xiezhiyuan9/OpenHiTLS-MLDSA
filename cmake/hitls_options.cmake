@@ -405,6 +405,8 @@ option(HITLS_CRYPTO_X25519_X8664                               "X25519 x86_64" O
 ## MLKEM
 option(HITLS_CRYPTO_MLKEM_ASM                                  "MLKEM ASM" OFF)
 option(HITLS_CRYPTO_MLKEM_ARMV8                                "MLKEM ARMv8" OFF)
+## MLDSA
+option(HITLS_CRYPTO_MLDSA_ARMV8                                "MLDSA ARMv8" OFF)
 
 # --- PKI Features ---
 ## X509

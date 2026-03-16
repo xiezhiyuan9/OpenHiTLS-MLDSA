@@ -14,6 +14,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include "hitls_build.h"
 #include "bsl_log_internal.h"
@@ -114,10 +115,34 @@ void BSL_SAL_CleanseData(void *ptr, uint32_t size)
     if (ptr == NULL || size == 0) {
         return;
     }
+    /*
+     * Use word-level zeroing to zero large crypto buffers efficiently while
+     * still defeating compiler dead-store elimination via the memory barrier.
+     * The volatile pointer prevents the store sequence from being removed, and
+     * the barrier ensures the writes are visible before any subsequent access.
+     *
+     * Per-byte volatile loop is ~20-50x slower than memset for the 48–120 KB
+     * polynomial buffers zeroed after every keygen/sign operation.
+     */
+#if defined(__aarch64__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_ARM64)
+    /* 64-bit platforms: zero 8 bytes at a time, handle tail bytes. */
+    volatile uint64_t *w = (volatile uint64_t *)(uintptr_t)ptr;
+    uint32_t words = size / sizeof(uint64_t);
+    for (uint32_t i = 0; i < words; i++) {
+        w[i] = 0;
+    }
+    volatile uint8_t *p = (volatile uint8_t *)(uintptr_t)((uint8_t *)ptr + words * sizeof(uint64_t));
+    uint32_t tail = size % sizeof(uint64_t);
+    for (uint32_t i = 0; i < tail; i++) {
+        p[i] = 0;
+    }
+#else
     volatile uint8_t *p = (volatile uint8_t *)ptr;
-    while (size--) {
+    uint32_t remaining = size;
+    while (remaining--) {
         *p++ = 0;
     }
+#endif
     __asm__ __volatile__("" : : "r"(ptr) : "memory");
 }
 
